@@ -1,0 +1,394 @@
+{
+  "name": "Watcher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        96
+      ],
+      "id": "98dd95c9-3184-44fa-8482-912f2b350e02",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.city_endpoint }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        96
+      ],
+      "id": "2a2b3f8e-1519-4b76-95ed-06f03763fadb",
+      "name": "HTTP Request",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const papers = $('HTTP Request').first().json.data || [];\nconst topics = $('Topics').all().map(r => r.json);\nconst seen = new Set($('SeenPapers').all().map(r => r.json.paper_id));\nconst hits = [];\nfor (const p of papers) {\n  if (seen.has(p.id)) continue;\n  const title = (p.name || '').toLowerCase();\n  for (const t of topics) {\n    if (title.includes((t.keyword || '').toLowerCase())) {\n      hits.push({ json: { paper_id: p.id, title: p.name, date: p.date,\n        subscriber: t.subscriber, keyword: t.keyword } });\n      break;\n    }\n  }\n}\nreturn hits;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        96
+      ],
+      "id": "d25bd00a-f007-4d60-b41e-c6e84d8a848a",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ompmQ2vGp5y8K4tV",
+          "mode": "list",
+          "cachedResultName": "watch_topics",
+          "cachedResultUrl": "/projects/Zi5K3IZsruIY7mqM/datatables/ompmQ2vGp5y8K4tV"
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        96
+      ],
+      "id": "0a26381c-18e7-4ce6-9f17-6497562e8b4b",
+      "name": "Topics"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "pw7Bbp470xMjDyAQ",
+          "mode": "list",
+          "cachedResultName": "seen_papers",
+          "cachedResultUrl": "/projects/Zi5K3IZsruIY7mqM/datatables/pw7Bbp470xMjDyAQ"
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        96
+      ],
+      "id": "410a42be-5397-44e0-889e-85abe063b344",
+      "name": "SeenPapers",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "model": "qwen3:14b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        320
+      ],
+      "id": "c4f22318-552c-47c0-8c18-bc09d66ca24e",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "Sq0OSVn4uOXOzkvk",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Paper title: {{ $json.title }}",
+        "options": {
+          "systemMessage": "/no_think\nYou explain local government documents to ordinary residents in plain, neutral German (or the reader's language). You are given a council paper title.\nWrite, in under 60 words:\n- one sentence on what it is about,\n- one sentence on why a resident might care.\nNo opinions. No guessing beyond the title."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1120,
+        96
+      ],
+      "id": "8730ee13-fa6a-420a-a883-3bf7a65093b9",
+      "name": "Summarise"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=TITLE: {{ $('Filter').item.json.title }}\nKEYWORD: {{ $('Filter').item.json.keyword }}\nSUMMARY: {{ $json.output }}",
+        "options": {
+          "systemMessage": "/no_think\nYou quality-check a plain-language summary before it is sent to a resident. You get the paper\nTITLE, the KEYWORD that matched, and the SUMMARY.\n- faithful: does the SUMMARY only state things supported by the title, with no opinion?\n- relevant: is the KEYWORD a genuine topical match, not a coincidental word?\nReturn ONLY JSON: { \"faithful\": true/false, \"relevant\": true/false }"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1472,
+        96
+      ],
+      "id": "09a3b240-174f-4dc9-b9a2-af531de203d1",
+      "name": "Check"
+    },
+    {
+      "parameters": {
+        "jsCode": "const filt = $('Filter').all();\nconst summ = $('Summarise').all();\nconst checks = $input.all();\nconst out = [];\nfor (let i = 0; i < checks.length; i++) {\n  const meta = filt[i]?.json || {};\n  const summary = (summ[i]?.json.output || '').trim();\n  const raw = checks[i]?.json.output || '';\n  let ok = false;\n  try {\n    const c = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));\n    ok = c.faithful === true && c.relevant === true;\n  } catch (e) {}\n  if (ok) out.push({ json: { ...meta, summary } });\n}\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        96
+      ],
+      "id": "ab1e4b6e-e0e5-4f22-8e20-29a22e0b9a2a",
+      "name": "Keep Good"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "pw7Bbp470xMjDyAQ",
+          "mode": "list",
+          "cachedResultName": "seen_papers",
+          "cachedResultUrl": "/projects/Zi5K3IZsruIY7mqM/datatables/pw7Bbp470xMjDyAQ"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "paper_id": "={{ $json.paper_id }}",
+            "processed_at": "={{ $now }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "paper_id",
+              "displayName": "paper_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "processed_at",
+              "displayName": "processed_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2048,
+        0
+      ],
+      "id": "b5b74ebd-ec40-4649-897c-2fc84f06628b",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $('Keep Good').all().map(i => i.json);\nconst byUser = {};\nfor (const it of items) (byUser[it.subscriber] ||= []).push(it);\nreturn Object.entries(byUser).map(([subscriber, list]) => ({\n  json: { subscriber,\n    body: list.map(x => `- ${x.title} (${x.date})\\n ${x.summary}`).join('\\n\\n') }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        192
+      ],
+      "id": "7eb511e8-36c4-41f3-a165-9e27d0412d20",
+      "name": "Digest"
+    },
+    {
+      "parameters": {
+        "fromEmail": "ENTER YOUR OWN EMAIL",
+        "toEmail": "={{ $json.subscriber }}",
+        "subject": "Council update",
+        "emailFormat": "text",
+        "text": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2272,
+        192
+      ],
+      "id": "e16bbbec-ceae-4815-8829-fd4f8770aa00",
+      "name": "Send an Email",
+      "webhookId": "83d14046-ca33-4758-9741-790723e193cd",
+      "credentials": {
+        "smtp": {
+          "id": "68NjqhwihPn8irP1",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Topics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "SeenPapers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Topics": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SeenPapers": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarise",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Check",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Summarise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarise": {
+      "main": [
+        [
+          {
+            "node": "Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check": {
+      "main": [
+        [
+          {
+            "node": "Keep Good",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Good": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        []
+      ]
+    },
+    "Digest": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "2a54bdf6-bf90-425d-8c49-252360b08a84",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "be89f19d1a8d3f925fa1406a82449c85a27f1114bc04567d2ab3dbaeab2c4e2a"
+  },
+  "nodeGroups": [],
+  "id": "Ipvuxr26nJWvvm2u",
+  "tags": []
+}

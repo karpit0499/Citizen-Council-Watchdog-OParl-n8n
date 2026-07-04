@@ -1,0 +1,18 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: council-watchdog-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Europe/Berlin
+    volumes:
+      - n8n_data:/home/node/.n8n
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  n8n_data:

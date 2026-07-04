@@ -1,0 +1,123 @@
+{
+  "name": "Subscribe",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Council Watch",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Your email"
+            },
+            {
+              "fieldLabel": "Keyword to watch"
+            },
+            {
+              "fieldLabel": "City OParl address"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b2fa907b-3293-43ff-8c4d-df7074a2fb24",
+      "name": "Council Watch",
+      "webhookId": "02ad824f-a31a-446b-88d0-7b6dff595c9b"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "ompmQ2vGp5y8K4tV",
+          "mode": "list",
+          "cachedResultName": "watch_topics",
+          "cachedResultUrl": "/projects/Zi5K3IZsruIY7mqM/datatables/ompmQ2vGp5y8K4tV"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "subscriber": "={{ $json[\"Your email\"] }}",
+            "keyword": "={{ $json[\"Keyword to watch\"] }}",
+            "city_endpoint": "={{ $json[\"City OParl address\"] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "subscriber",
+              "displayName": "subscriber",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "keyword",
+              "displayName": "keyword",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "city_endpoint",
+              "displayName": "city_endpoint",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "6dcf51ca-3f8b-4fc0-a04d-c7cc8f28cdaf",
+      "name": "Insert row"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Council Watch": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6f776831-1116-46b5-bca4-1b0cdef9101a",
+  "meta": {
+    "instanceId": "be89f19d1a8d3f925fa1406a82449c85a27f1114bc04567d2ab3dbaeab2c4e2a"
+  },
+  "nodeGroups": [],
+  "id": "CjYpHZaLJsIsArUA",
+  "tags": []
+}
